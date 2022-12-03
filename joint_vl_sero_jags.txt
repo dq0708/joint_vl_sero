@@ -1,0 +1,185 @@
+model{
+
+	tau_yy ~ dscaled.gamma(1, 30)
+	sigma_yy <- pow(tau_yy, -0.5)
+
+	delta_Q ~ dbeta(10, 30)
+
+	for (k in 1:nBaseCov_vp){
+		beta_vp[k] ~ dnorm(0, 4)
+	}
+
+	mu_lvp ~ dnorm(log(5), 1/(0.2^2))
+	mu_lwa ~ dnorm(log(2), 1/(0.2^2))
+	mu_lwb ~ dnorm(log(9), 1/(0.2^2))
+
+	mu_log[1] <- mu_lvp
+	mu_log[2] <- mu_lwa
+	mu_log[3] <- mu_lwb
+
+	Omega_log ~ dwish(I_mt, 20)
+	Sigma_log <- inverse(Omega_log)
+
+	alpha0 ~ dnorm(-4, 1/(0.2^2))
+	alpha1 ~ dnorm(8, 1/(0.1^2))
+
+	###################################
+
+	mu_td ~ dnorm(0, 2)
+
+	tau_yy_sg ~ dscaled.gamma(1, 30)
+	sigma_yy_sg <- pow(tau_yy_sg, -0.5)
+
+	gamma_1 ~ dgamma(20, 1)
+	gamma_2 ~ dgamma(10, 1)
+
+	mu_q <- gamma_1/(gamma_1 + gamma_2)
+
+	mu_lwd ~ dnorm(log(5), 1/(0.2^2))
+
+	tau_lwd ~ dscaled.gamma(1, 30)
+	sigma_lwd <- pow(tau_lwd, -0.5)
+
+	alpha0_sg ~ dnorm(-4, 1/(0.2^2))
+	alpha1_sg ~ dnorm(8, 1/(0.1^2))
+
+	###################################
+
+	for (k in 1:2){
+		beta_C[k] ~ dnorm(0, 4)
+	}
+
+	kappa_1 ~ dgamma(50, 2)
+	kappa_2 ~ dgamma(20, 10)
+
+	mu_w_s <- kappa_1/kappa_2
+
+	###################################
+
+	for (i_N in N_cen_index_vt){
+		t_p[i_N] ~ dnorm(0, 1)
+	}
+
+	for (i_L in L_cen_index_vt){
+		t_p[i_L] ~ dnorm(-2, 2)T(, 1)
+	}
+
+	for (i_R in R_cen_index_vt){
+		t_p[i_R] ~ dnorm(2, 2)T(-1, )
+	}
+
+	###################################
+
+	for (i in 1:n){
+
+		log_mt[i, 1:3] ~ dmnorm(mu_log, Omega_log)
+		
+		v_p[i] <- exp(log_mt[i, 1] + inprod(beta_vp[1:nBaseCov_vp], BaseCov_vp[i, ]))
+		w_a[i] <- exp(log_mt[i, 2])
+		w_b[i] <- exp(log_mt[i, 3])
+		
+		beta_up[i] <- v_p[i]/w_a[i]
+		beta_down[i] <- -v_p[i]/w_b[i]
+
+		###################################
+
+		t_d_sg[i] ~ dnorm(mu_td, 2)T(-w_a[i], w_b[i])
+		t_p_sg[i] <- t_p[i] + t_d_sg[i]
+
+		q_sg[i] ~ dbeta(gamma_1, gamma_2)
+		v_p_sg[i] <- v_p[i] * q_sg[i]
+		
+		log_w_d_sg[i] ~ dnorm(mu_lwd, tau_lwd)T(, log(w_b[i] - t_d_sg[i]))
+		w_d_sg[i] <- exp(log_w_d_sg[i])
+
+		w_a_sg[i] <- w_a[i] + t_d_sg[i]
+		w_b_sg[i] <- w_a[i] + w_b[i] - w_a_sg[i] - w_d_sg[i]
+
+		beta_up_sg[i] <- v_p_sg[i]/w_a_sg[i]
+		beta_down_sg[i] <- -v_p_sg[i]/w_b_sg[i]
+
+		###################################
+                
+		for(j in 1:J[i]){
+			
+			s[i0[i]+j-1] <- t[i0[i]+j-1] - t_p[i]
+
+			S_1[i0[i]+j-1] <- ifelse(s[i0[i]+j-1] >= -w_a[i], 1, 0)
+			S_2[i0[i]+j-1] <- ifelse(s[i0[i]+j-1] <= w_b[i], 1, 0)
+			S[i0[i]+j-1] ~ dbern(S_1[i0[i]+j-1] * S_2[i0[i]+j-1])
+
+			p_B[i0[i]+j-1] <- ilogit(alpha0 + alpha1 * S[i0[i]+j-1])
+			B[i0[i]+j-1] ~ dbern(p_B[i0[i]+j-1])
+
+			s_up1[i0[i]+j-1] <- ifelse(s[i0[i]+j-1] >= -w_a[i], 1, 0)
+			s_up2[i0[i]+j-1] <- ifelse(s[i0[i]+j-1] < 0, 1, 0)
+			s_up[i0[i]+j-1] <- s[i0[i]+j-1] * s_up1[i0[i]+j-1] * s_up2[i0[i]+j-1]
+
+			s_down1[i0[i]+j-1] <- ifelse(s[i0[i]+j-1] > 0, 1, 0)
+			s_down2[i0[i]+j-1] <- ifelse(s[i0[i]+j-1] <= w_b[i], 1, 0)
+			s_down[i0[i]+j-1] <- s[i0[i]+j-1] * s_down1[i0[i]+j-1] * s_down2[i0[i]+j-1]
+
+			mu_y[i0[i]+j-1] <- LoD_40_diag + (v_p[i] * S[i0[i]+j-1] + beta_up[i] * s_up[i0[i]+j-1] + beta_down[i] * s_down[i0[i]+j-1]) * S[i0[i]+j-1] * B[i0[i]+j-1] + 2 * (1 - S[i0[i]+j-1]) * B[i0[i]+j-1] 
+			tau_y[i0[i]+j-1] <- 1/((1/tau_yy) * (1 + Q[i0[i]+j-1] * delta_Q)) * S[i0[i]+j-1] * B[i0[i]+j-1] + 1 * (1 - S[i0[i]+j-1]) * B[i0[i]+j-1] + 10000 * (1 - S[i0[i]+j-1]) * (1 - B[i0[i]+j-1]) + 10000 * S[i0[i]+j-1] * (1 - B[i0[i]+j-1])
+			sigma_y[i0[i]+j-1] <- pow(tau_y[i0[i]+j-1], -0.5)
+
+			y[i0[i]+j-1] ~ dnorm(mu_y[i0[i]+j-1], tau_y[i0[i]+j-1])T(LoD_40_diag, LoD_0_diag)
+
+			###################################
+
+			s_sg[i0[i]+j-1] <- t[i0[i]+j-1] - t_p_sg[i]
+
+			S_1_sg[i0[i]+j-1] <- ifelse(s_sg[i0[i]+j-1] >= -w_a_sg[i], 1, 0)
+			S_2_sg[i0[i]+j-1] <- ifelse(s_sg[i0[i]+j-1] <= w_b_sg[i], 1, 0)
+			S_sg[i0[i]+j-1] ~ dbern(S_1_sg[i0[i]+j-1] * S_2_sg[i0[i]+j-1])
+
+			p_B_sg[i0[i]+j-1] <- ilogit(alpha0_sg + alpha1_sg * S_sg[i0[i]+j-1])
+			B_sg[i0[i]+j-1] ~ dbern(B[i0[i]+j-1] * p_B_sg[i0[i]+j-1])
+
+			s_up1_sg[i0[i]+j-1] <- ifelse(s_sg[i0[i]+j-1] >= -w_a_sg[i], 1, 0)
+			s_up2_sg[i0[i]+j-1] <- ifelse(s_sg[i0[i]+j-1] < 0, 1, 0)
+			s_up_sg[i0[i]+j-1] <- s_sg[i0[i]+j-1] * s_up1_sg[i0[i]+j-1] * s_up2_sg[i0[i]+j-1]
+
+			s_down1_sg[i0[i]+j-1] <- ifelse(s_sg[i0[i]+j-1] > 0, 1, 0)
+			s_down2_sg[i0[i]+j-1] <- ifelse(s_sg[i0[i]+j-1] <= w_b_sg[i], 1, 0)
+			s_down_sg[i0[i]+j-1] <- s_sg[i0[i]+j-1] * s_down1_sg[i0[i]+j-1] * s_down2_sg[i0[i]+j-1]
+
+			mu_y_sg[i0[i]+j-1] <- LoD_40_sgRNA + (v_p_sg[i] * S_sg[i0[i]+j-1] + beta_up_sg[i] * s_up_sg[i0[i]+j-1] + beta_down_sg[i] * s_down_sg[i0[i]+j-1]) * S_sg[i0[i]+j-1] * B_sg[i0[i]+j-1] + 2 * (1 - S_sg[i0[i]+j-1]) * B_sg[i0[i]+j-1] 
+			tau_y_sg[i0[i]+j-1] <- tau_yy_sg * S_sg[i0[i]+j-1] * B_sg[i0[i]+j-1] + 1 * (1 - S_sg[i0[i]+j-1]) * B_sg[i0[i]+j-1] + 10000 * (1 - S_sg[i0[i]+j-1]) * (1 - B_sg[i0[i]+j-1]) + 10000 * S_sg[i0[i]+j-1] * (1 - B_sg[i0[i]+j-1])
+			sigma_y_sg[i0[i]+j-1] <- pow(tau_y_sg[i0[i]+j-1], -0.5)
+
+			y_sg[i0[i]+j-1] ~ dnorm(mu_y_sg[i0[i]+j-1], tau_y_sg[i0[i]+j-1])T(LoD_40_sgRNA, LoD_0_sgRNA)
+
+		}
+	}
+
+	###################################
+
+	for (i_S in 1:n){
+		p_C[i_S] <- ilogit(beta_C[1] + beta_C[2] * v_p[i_S])
+		C[i_S] ~ dbern(p_C[i_S])
+	}
+
+	for (i_SR in sero_R_cen_index_vt){
+		cut_L[i_SR] <- max(0, day_last_ABNotPos_vt[i_SR] - day_peak_diag_vt[i_SR] - t_p[i_SR] + w_a[i_SR])
+		p_cens[i_SR] <- 1 - pgamma(cut_L[i_SR], kappa_1, kappa_2)
+		
+		sero_R_cen_vt[i_SR] ~ dbern( C[i_SR] * p_cens[i_SR] + (1-C[i_SR]) )
+	}
+
+	for (i_SL in sero_L_0_index_vt){
+		cut_U[i_SL] <- day_first_ABPos_vt[i_SL] - day_peak_diag_vt[i_SL] - t_p[i_SL] + w_a[i_SL]
+		p_cens[i_SL] <- pgamma(cut_U[i_SL], kappa_1, kappa_2)
+
+		sero_L_0_vt[i_SL] ~ dbern( C[i_SL] * p_cens[i_SL] )
+	}
+
+	for (i_SI in sero_interv_index_vt){
+		cut_L[i_SI] <- max(0, day_last_ABNotPos_vt[i_SI] - day_peak_diag_vt[i_SI] - t_p[i_SI] + w_a[i_SI])
+		cut_U[i_SI] <- day_first_ABPos_vt[i_SI] - day_peak_diag_vt[i_SI] - t_p[i_SI] + w_a[i_SI]
+		p_cens[i_SI] <- pgamma(cut_U[i_SI], kappa_1, kappa_2) - pgamma(cut_L[i_SI], kappa_1, kappa_2)
+
+		sero_interv_vt[i_SI] ~ dbern( C[i_SI] * p_cens[i_SI] )
+	}
+
+}
