@@ -4,4 +4,4 @@ Here are some example R code and JAGS code for the model implementation in "A jo
 
 - *joint_vl_sero_r.R*: R codes for fitting the joint Bayesian model. 
 
-- *joint_vl_sero_jags.txt*: JAGS codes for the joint Bayesian model. 
+- *joint_vl_sero_jags.txt*: JAGS codes for fitting the joint Bayesian model. 
