@@ -5,3 +5,5 @@ Here are some example R code and JAGS code for the model implementation in "A jo
 - *joint_vl_sero_r.R*: R code for fitting the joint Bayesian model. 
 
 - *joint_vl_sero_jags.txt*: JAGS code for fitting the joint Bayesian model. 
+
+- *model_par_diag_Covid.pdf*: Full model diagnostic report for the primary model fitted to the COVID-19 PEP study data, as described in Section 4.1 of the main manuscript. 
