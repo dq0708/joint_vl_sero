@@ -6,7 +6,7 @@ Here are some example R code and JAGS code for the model implementation in "A jo
 
 2. *joint_vl_sero_jags.txt*: JAGS code for fitting the joint Bayesian model. 
 
-3. *model_par_diag_primary.pdf*: Full model diagnostic report for the primary model fitted to the COVID-19 PEP study data, as described in Section 4.1 of the main manuscript and Section S1.3 of the Supplement. The \texttt{ggmcmc} package in R (version 1.5.1.1) was used to create this report. Specifically, we examined the following plots and summary metrics for key model parameters: 
+3. *model_par_diag_primary.pdf*: Full model diagnostic report for the primary model fitted to the COVID-19 PEP study data, as described in Section 4.1 of the main manuscript and Section S1.3 of the Supplement. The *ggmcmc* package in R (version 1.5.1.1) was used to create this report. Specifically, we examined the following plots and summary metrics for key model parameters: 
 
 - Histograms of posterior samples.
 - Density plots with different colors by chain. 
